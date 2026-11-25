@@ -95,6 +95,7 @@ details{margin-top:14px}summary{cursor:pointer;font-weight:600;padding:8px 0}
       <div><label for="age">Uzrast</label><select id="age"><option value="mlađi osnovci (7–10 godina)">7–10 god.</option><option value="stariji osnovci (11–14 godina)" selected>11–14 god.</option><option value="srednjoškolci i odrasli">15+ god.</option></select></div>
       <div><label for="lvl">Težina</label><select id="lvl"><option value="laka">Laka</option><option value="srednja" selected>Srednja</option><option value="teška">Teška</option></select></div>
       <button class="btn gold" id="bGen">Popuni tablu</button>
+      <div class="wide hide" id="passBox"><label for="pass">Šifra za nastavnike (potrebna za automatsko popunjavanje)</label><input id="pass" type="password" autocomplete="current-password" placeholder="Unesi šifru"></div>
     </div>
     <p class="msg" id="msg"></p>
   </div>
@@ -143,7 +144,7 @@ function edCol(i){
   const c=game.cols[i],up=i>1;
   const clues=c.clues.map((v,j)=>`<div class="cell"><input data-c="${i}" data-j="${j}" value="${esc(v)}" placeholder="${L[i]}${j+1}" aria-label="${L[i]}${j+1}"></div>`).join('');
   const sol=`<div class="cell sol"><input data-c="${i}" data-s="1" value="${esc(c.sol)}" placeholder="Rešenje ${L[i]}" aria-label="Rešenje kolone ${L[i]}"></div>`;
-  const head=`<div class="colhead"><span>Kolona ${L[i]}</span><button data-re="${i}" class="${sample?'':'hide'}" title="Nova kolona">↻ nova</button></div>`;
+  const head=`<div class="colhead"><span>Kolona ${L[i]}</span><button data-re="${i}" title="Nova kolona">↻ nova</button></div>`;
   return `<div class="col ${up?'up':''}">${head+clues+sol}</div>`;
 }
 function renderEd(){
@@ -177,7 +178,21 @@ Pravila:
 Odgovori SAMO JSON-om, bez objašnjenja, u obliku:
 ${only?'{"sol":"...","alt":["..."],"clues":["...","...","...","..."]}':'{"final_alt":["..."],"cols":[{"sol":"...","alt":["..."],"clues":["...","...","...","..."]}, … ukupno 4]}'}`;
 }
-async function ask(p){
+const API='https://dyipdqzqohthcqntnjxo.supabase.co/functions/v1/asocijacije';
+const ERR={wrong_password:'Pogrešna šifra za nastavnike.',rate_limited:'Previše zahteva — sačekaj malo pa pokušaj ponovo.',no_credit:'Nema kredita na Anthropic nalogu — dopuni ga.',not_configured:'Server još nije podešen (nedostaje ključ ili šifra).'};
+async function askRemote(final,only){
+  const password=$('pass').value;
+  if(!password){const e=new Error('nopass');e.code='nopass';throw e}
+  const avoid=game.cols.map(c=>c.sol).filter(Boolean).join(', ');
+  const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password,final,only,avoid,lang:$('lang').value,age:$('age').value,lvl:$('lvl').value})});
+  const d=await res.json().catch(()=>({}));
+  if(!res.ok||!d.result){const e=new Error(d.error||'ai_error');e.code=d.error||'ai_error';throw e}
+  try{localStorage.setItem('asocijacije.pass',password)}catch(e){}
+  return d.result;
+}
+async function ask(final,only){
+  if(!sample)return askRemote(final,only);
+  const p=prompt(final,only);
   let r;
   if(typeof sample.json==='function')r=await sample.json(p,{modelTier:'default',cache:false});
   else{const t=(await sample(p,{modelTier:'default',cache:false})).text;r=JSON.parse(t.slice(t.indexOf('{'),t.lastIndexOf('}')+1))}
@@ -190,26 +205,26 @@ let busy=false;
 async function generate(){
   const final=$('fin').value.trim();
   if(!final){msg('Upiši konačno rešenje.',true);$('fin').focus();return}
-  if(!sample){msg('Automatsko popunjavanje ovde nije dostupno — popuni polja ručno.',true);return}
+  if(!sample&&!$('pass').value){msg('Upiši šifru za nastavnike.',true);$('pass').focus();return}
   if(busy)return;busy=true;$('bGen').disabled=true;msg('Smišljam kolone…');
   try{
     game.cols=blank().cols;
-    const r=await ask(prompt(final,false));
+    const r=await ask(final,false);
     if(!r||!Array.isArray(r.cols)||r.cols.length<4)throw new Error('format');
     game.final=withAlt(final,r.final_alt);
     game.cols=r.cols.slice(0,4).map(clean);
     renderEd();$('fin').value=game.final;msg('Gotovo! Proveri pojmove, izmeni šta želiš i klikni „Igraj”.');
   }catch(e){
     renderEd();
-    msg(e&&e.code==='rate_limited'?'Previše zahteva — sačekaj malo pa pokušaj ponovo.':e&&e.code==='not_granted'?'Dozvola za Claude nije data — popuni polja ručno.':'Nije uspelo popunjavanje. Pokušaj ponovo.',true);
+    msg(e&&ERR[e.code]||(e&&e.code==='not_granted'?'Dozvola za Claude nije data — popuni polja ručno.':'Nije uspelo popunjavanje. Pokušaj ponovo.'),true);
   }finally{busy=false;$('bGen').disabled=false}
 }
 async function regenCol(i){
   const final=(game.final||$('fin').value).split('/')[0].trim();
   if(!final){msg('Prvo upiši konačno rešenje.',true);return}
-  if(!sample||busy)return;busy=true;msg(`Pravim novu kolonu ${L[i]}…`);
-  try{const r=await ask(prompt(final,true));if(!r||!r.sol)throw 0;game.cols[i]=clean(r);renderEd();msg(`Kolona ${L[i]} je zamenjena.`)}
-  catch(e){msg('Nova kolona nije uspela. Pokušaj ponovo.',true)}finally{busy=false}
+  if(busy)return;if(!sample&&!$('pass').value){msg('Upiši šifru za nastavnike.',true);$('pass').focus();return}busy=true;msg(`Pravim novu kolonu ${L[i]}…`);
+  try{const r=await ask(final,true);if(!r||!r.sol)throw 0;game.cols[i]=clean(r);renderEd();msg(`Kolona ${L[i]} je zamenjena.`)}
+  catch(e){msg(e&&ERR[e.code]||'Nova kolona nije uspela. Pokušaj ponovo.',true)}finally{busy=false}
 }
 $('bGen').onclick=generate;
 
@@ -314,7 +329,7 @@ msg('Učitavam pomoćnika…');
   for(let t=0;t<20&&!window.claude;t++)await new Promise(r=>setTimeout(r,250));
   try{sample=window.claude?await window.claude.use('sample'):null}catch(e){sample=null}
   if(sample){msg('Upiši konačno rešenje i klikni „Popuni tablu”.');renderEd()}
-  else msg('Automatsko popunjavanje ovde nije dostupno — sva polja možeš popuniti ručno.');
+  else{$('passBox').classList.remove('hide');try{$('pass').value=localStorage.getItem('asocijacije.pass')||''}catch(e){}msg('Upiši konačno rešenje i šifru za nastavnike, pa klikni „Popuni tablu”. Polja možeš popuniti i ručno.')}
 })();
 }
 </script>
