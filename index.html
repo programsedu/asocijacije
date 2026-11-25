@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="sr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Asocijacije</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: studio kviza, razigrano ali uredno — za razred i projektor
+   IDEA: tabla iz TV kviza: četiri kolone se slivaju ka konačnom rešenju u sredini
+   PICTURE: sama tabla je slika — svetleće pločice, zlatni centar
+   COLOUR and TYPE: duboka studijska plava, svetla plava pločica, zlatni akcenat; Barlow Condensed za pločice
+   LAYOUT: gore unos i dugmad, ispod velika tabla; uređivač i igra koriste istu tablu */
+:root{color-scheme:light dark;
+--bg:light-dark(#e9eef8,#0a1430);--panel:light-dark(#ffffff,#121f45);--ink:light-dark(#0b1633,#eef3ff);--mute:light-dark(#4b5a7d,#9fb0d8);
+--tile:light-dark(#1d4fb8,#1e4fc0);--tile2:light-dark(#163d91,#173c96);--tileInk:#fff;--open:light-dark(#ffffff,#e9f0ff);--openInk:#0b1633;
+--gold:#ffc23a;--goldInk:#2a1c00;--ok:#1fae6a;--bad:#e5484d;--line:light-dark(#cdd6ea,#26376b)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip}
+h1{font:700 clamp(32px,5vw,48px)/1.05 "Barlow Condensed",sans-serif;margin:0;letter-spacing:.01em}
+.top{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:12px;padding:20px max(4vw,14px) 8px;max-width:1240px;margin:auto}
+.top p{margin:4px 0 0;color:var(--mute)}
+.tabs{display:flex;gap:6px;background:var(--panel);padding:4px;border-radius:12px;border:1px solid var(--line)}
+.tabs button{border:0;background:none;color:var(--ink);font:600 16px Barlow;padding:10px 16px;border-radius:9px;min-height:44px;cursor:pointer}
+.tabs button.on{background:var(--tile);color:#fff}
+main{max-width:1240px;margin:auto;padding:8px max(4vw,14px) 40px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px}
+.gen{display:grid;grid-template-columns:minmax(0,2fr) repeat(3,minmax(0,1fr)) auto;gap:10px;align-items:end}
+label{display:block;font-size:14px;color:var(--mute);font-weight:500;margin-bottom:4px}
+input,select,textarea{width:100%;font:16px Barlow;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:10px 12px;min-height:44px}
+input:focus-visible,select:focus-visible,textarea:focus-visible,button:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.btn{font:600 16px Barlow;border:0;border-radius:10px;padding:10px 18px;min-height:44px;cursor:pointer;background:var(--tile);color:#fff;white-space:nowrap}
+.btn.gold{background:var(--gold);color:var(--goldInk)}.btn.ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+.btn:disabled{opacity:.55;cursor:wait}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.msg{min-height:24px;margin:10px 2px 0;color:var(--mute);font-size:15px}.msg.err{color:var(--bad)}
+/* tabla */
+.board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(10px,2vw,28px) clamp(12px,3vw,48px);margin-top:16px;padding:clamp(12px,2.5vw,28px);border-radius:22px;
+background:radial-gradient(ellipse at 50% 50%,light-dark(#2a5cc9,#1b3d8f) 0%,light-dark(#0f2a6b,#081233) 70%);box-shadow:0 18px 40px -20px #0a1a4a}
+.col{display:flex;flex-direction:column;gap:8px}.col.up{flex-direction:column-reverse}
+.cell{position:relative;display:flex;align-items:center;justify-content:center;text-align:center;min-height:52px;padding:6px 10px;border-radius:10px;
+background:linear-gradient(180deg,var(--tile),var(--tile2));color:var(--tileInk);font:600 clamp(17px,2vw,22px)/1.1 "Barlow Condensed",sans-serif;
+border:1px solid #ffffff2a;box-shadow:inset 0 1px 0 #ffffff40,0 3px 0 #06123a;cursor:pointer;user-select:none;overflow-wrap:anywhere}
+.cell.open{background:var(--open);color:var(--openInk);cursor:default}
+.cell.sol{background:linear-gradient(180deg,#0e2f86,#0a2266);min-height:58px;font-size:clamp(19px,2.3vw,26px);letter-spacing:.02em}
+.cell.sol.done{background:var(--gold);color:var(--goldInk)}
+.cell.final{grid-column:1/-1;justify-self:center;width:min(100%,520px);min-height:72px;background:linear-gradient(180deg,#ffd665,#f0a915);color:var(--goldInk);font-size:clamp(24px,3.4vw,36px);border-color:#fff6}
+.cell.final.hid{background:linear-gradient(180deg,#0e2f86,#081c55);color:#fff}
+.cell.final.done{animation:pop .5s ease}
+@keyframes pop{50%{transform:scale(1.06)}}
+@media(prefers-reduced-motion:reduce){.cell.final.done{animation:none}}
+.cell input{background:#fff;color:#0b1633;border:0;text-align:center;font:600 18px Barlow;min-height:40px}
+.tag{position:absolute;left:8px;top:4px;font:600 12px Barlow;opacity:.7}
+.cell.open .tag{opacity:.45}
+.cell.wrong{animation:shake .35s}@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+/* uređivač */
+.ed .cell{cursor:default;padding:4px}.ed .cell input{min-height:42px;font-size:17px}
+.ed .cell.sol input{background:#fff6dc}.ed .cell.final input{font-size:22px;min-height:50px;background:#fffdf4}
+.colhead{display:flex;justify-content:space-between;align-items:center;color:#cfe0ff;font:600 15px Barlow;padding:0 2px}
+.colhead button{background:#ffffff1f;color:#fff;border:0;border-radius:8px;font:600 14px Barlow;padding:6px 10px;min-height:36px;cursor:pointer}
+.hint{font-size:14px;color:var(--mute);margin:8px 2px 0}
+/* igra */
+.score{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-top:12px}
+.teams{display:flex;gap:10px;flex-wrap:wrap}
+.team{display:flex;align-items:center;gap:10px;padding:8px 14px;border-radius:12px;background:var(--panel);border:2px solid var(--line);font-weight:600}
+.team b{font:700 28px "Barlow Condensed";min-width:2ch;text-align:right}
+.team.on{border-color:var(--gold);box-shadow:0 0 0 3px #ffc23a44}
+.team .dot{width:12px;height:12px;border-radius:50%}
+.lib{display:grid;gap:8px;margin-top:10px}
+.lib div{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.lib span{font-weight:600}
+textarea{min-height:90px;font:13px/1.4 ui-monospace,monospace}
+.hide{display:none!important}
+details{margin-top:14px}summary{cursor:pointer;font-weight:600;padding:8px 0}
+@media(max-width:760px){.gen{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gen .wide{grid-column:1/-1}}
+@media(max-width:520px){.board{grid-template-columns:minmax(0,1fr)}.col.up{flex-direction:column}.cell{min-height:46px}.cell.final{order:5}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div><h1>Asocijacije</h1><p>Upiši konačno rešenje — tabla se popuni sama i spremna je za igru.</p></div>
+  <nav class="tabs" aria-label="Režim"><button id="tEd" class="on">Priprema</button><button id="tPlay">Igra</button></nav>
+</header>
+<main>
+<section id="vEd">
+  <div class="card">
+    <div class="gen">
+      <div class="wide"><label for="fin">Konačno rešenje</label><input id="fin" placeholder="npr. ZIMA" autocomplete="off"></div>
+      <div><label for="lang">Jezik</label><select id="lang">
+        <option value="srpski, latinica">Srpski (latinica)</option><option value="srpski, ćirilica">Srpski (ћирилица)</option>
+        <option value="makedonski (ćirilica)">Македонски</option><option value="bugarski (ćirilica)">Български</option>
+        <option value="rumunski">Română</option><option value="engleski">English</option></select></div>
+      <div><label for="age">Uzrast</label><select id="age"><option value="mlađi osnovci (7–10 godina)">7–10 god.</option><option value="stariji osnovci (11–14 godina)" selected>11–14 god.</option><option value="srednjoškolci i odrasli">15+ god.</option></select></div>
+      <div><label for="lvl">Težina</label><select id="lvl"><option value="laka">Laka</option><option value="srednja" selected>Srednja</option><option value="teška">Teška</option></select></div>
+      <button class="btn gold" id="bGen">Popuni tablu</button>
+    </div>
+    <p class="msg" id="msg"></p>
+  </div>
+  <div class="board ed" id="edBoard"></div>
+  <p class="hint">Sva polja možeš ručno da menjaš. U rešenja kolona i konačno rešenje možeš dodati više prihvatljivih odgovora odvojenih kosom crtom, npr. <b>AUTO / AUTOMOBIL</b>. Dugme ↻ pravi novu kolonu za isto konačno rešenje.</p>
+  <div class="row" style="margin-top:12px">
+    <button class="btn gold" id="bPlay">Igraj ovu asocijaciju ▶</button>
+    <button class="btn ghost" id="bSave">Sačuvaj</button>
+    <button class="btn ghost" id="bClear">Očisti tablu</button>
+  </div>
+  <details class="card" id="libBox"><summary>Sačuvane asocijacije i deljenje</summary>
+    <div class="lib" id="lib"></div>
+    <p class="hint">Kod igre kopiraj i pošalji drugom nastavniku; on ga nalepi ovde i klikne „Učitaj kod”.</p>
+    <div class="row"><button class="btn ghost" id="bCode">Napravi kod ove table</button><button class="btn ghost" id="bLoad">Učitaj kod</button><button class="btn ghost" id="bCopy">Kopiraj</button></div>
+    <textarea id="code" style="margin-top:8px" placeholder="Ovde se pojavljuje kod igre ili ga nalepi…"></textarea>
+  </details>
+</section>
+
+<section id="vPlay" class="hide">
+  <div class="score">
+    <div class="teams" id="teams"></div>
+    <div class="row">
+      <label style="display:flex;gap:6px;align-items:center;margin:0"><input type="checkbox" id="twoT" style="width:20px;min-height:20px" checked> Dva tima</label>
+      <button class="btn ghost" id="bPass">Dalje (sledeći tim)</button>
+      <button class="btn ghost" id="bReveal">Otkrij sve</button>
+      <button class="btn" id="bRestart">Ispočetka</button>
+    </div>
+  </div>
+  <div class="board" id="plBoard"></div>
+  <p class="hint">Klikni polje da ga otvoriš. Klikni rešenje kolone ili konačno rešenje da upišeš odgovor. Kolona donosi 2 boda + 1 za svako neotvoreno polje; konačno rešenje 7 bodova + bodove svih nerešenih kolona. Pogrešan odgovor predaje potez drugom timu.</p>
+</section>
+</main>
+
+<script>
+{
+const L=['A','B','C','D'];
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const blank=()=>({final:'',cols:L.map(()=>({sol:'',clues:['','','','']}))});
+let game=blank(), sample=null;
+const KEY='asocijacije.v1';
+const store={get(){try{return JSON.parse(localStorage.getItem(KEY)||'{}')}catch(e){return{}}},set(v){try{localStorage.setItem(KEY,JSON.stringify(v))}catch(e){}}};
+
+/* ---------- uređivač ---------- */
+function edCol(i){
+  const c=game.cols[i],up=i>1;
+  const clues=c.clues.map((v,j)=>`<div class="cell"><input data-c="${i}" data-j="${j}" value="${esc(v)}" placeholder="${L[i]}${j+1}" aria-label="${L[i]}${j+1}"></div>`).join('');
+  const sol=`<div class="cell sol"><input data-c="${i}" data-s="1" value="${esc(c.sol)}" placeholder="Rešenje ${L[i]}" aria-label="Rešenje kolone ${L[i]}"></div>`;
+  const head=`<div class="colhead"><span>Kolona ${L[i]}</span><button data-re="${i}" class="${sample?'':'hide'}" title="Nova kolona">↻ nova</button></div>`;
+  return `<div class="col ${up?'up':''}">${head+clues+sol}</div>`;
+}
+function renderEd(){
+  const b=$('edBoard');
+  b.innerHTML=edCol(0)+edCol(1)+`<div class="cell final"><input id="finB" value="${esc(game.final)}" placeholder="KONAČNO REŠENJE" aria-label="Konačno rešenje"></div>`+edCol(2)+edCol(3);
+}
+$('edBoard').addEventListener('input',e=>{
+  const t=e.target;if(t.id==='finB'){game.final=t.value;$('fin').value=t.value;return}
+  const i=+t.dataset.c;if(t.dataset.s)game.cols[i].sol=t.value;else game.cols[i].clues[+t.dataset.j]=t.value;
+});
+$('edBoard').addEventListener('click',e=>{const r=e.target.closest('[data-re]');if(r)regenCol(+r.dataset.re)});
+$('fin').addEventListener('input',e=>{game.final=e.target.value;const f=$('finB');if(f)f.value=e.target.value});
+$('fin').addEventListener('keydown',e=>{if(e.key==='Enter')generate()});
+
+function msg(t,err){const m=$('msg');m.textContent=t;m.classList.toggle('err',!!err)}
+
+/* ---------- Claude popunjava ---------- */
+function prompt(final,only){
+  const lang=$('lang').value,age=$('age').value,lvl=$('lvl').value;
+  const avoid=game.cols.map(c=>c.sol).filter(Boolean).join(', ');
+  return `Praviš igru "Asocijacije" (kao u kvizu Slagalica) za učionicu.
+Konačno rešenje: "${final}".
+Jezik svih pojmova: ${lang}. Uzrast igrača: ${age}. Težina: ${lvl}.
+Pravila:
+- ${only?`Napravi JEDNU novu kolonu. Njeno rešenje mora biti jasno povezano sa konačnim rešenjem i različito od već postojećih: ${avoid||'(nema)'}.`:'Napravi 4 kolone (A, B, C, D). Rešenje svake kolone je pojam koji se jasno povezuje sa konačnim rešenjem; četiri rešenja zajedno moraju nedvosmisleno voditi do konačnog rešenja, ali svako iz drugog ugla.'}
+- Svaka kolona ima tačno 4 pojma koja se povezuju sa rešenjem kolone (ne direktno sa konačnim rešenjem). Poređaj ih od najtežeg (1) do najlakšeg (4).
+- Pojmovi su jedna reč ili kratka fraza (najviše 3 reči), poznati uzrastu, bez ponavljanja.
+- Nijedan pojam ne sme sadržati rešenje kolone ni konačno rešenje, niti njihov koren reči.
+- Sve piši VELIKIM SLOVIMA, na zadatom jeziku i pismu.
+- Za svako rešenje navedi do 2 prihvatljiva sinonima ili oblika (može prazna lista).
+Odgovori SAMO JSON-om, bez objašnjenja, u obliku:
+${only?'{"sol":"...","alt":["..."],"clues":["...","...","...","..."]}':'{"final_alt":["..."],"cols":[{"sol":"...","alt":["..."],"clues":["...","...","...","..."]}, … ukupno 4]}'}`;
+}
+async function ask(p){
+  let r;
+  if(typeof sample.json==='function')r=await sample.json(p,{modelTier:'default',cache:false});
+  else{const t=(await sample(p,{modelTier:'default',cache:false})).text;r=JSON.parse(t.slice(t.indexOf('{'),t.lastIndexOf('}')+1))}
+  if(typeof r==='string')r=JSON.parse(r.slice(r.indexOf('{'),r.lastIndexOf('}')+1));
+  return r;
+}
+const withAlt=(s,alt)=>[s,...(Array.isArray(alt)?alt:[])].map(x=>String(x||'').trim()).filter(Boolean).filter((x,i,a)=>a.indexOf(x)===i).join(' / ');
+const clean=c=>({sol:withAlt(c.sol,c.alt),clues:[0,1,2,3].map(j=>String((c.clues||[])[j]||'').trim())});
+let busy=false;
+async function generate(){
+  const final=$('fin').value.trim();
+  if(!final){msg('Upiši konačno rešenje.',true);$('fin').focus();return}
+  if(!sample){msg('Automatsko popunjavanje ovde nije dostupno — popuni polja ručno.',true);return}
+  if(busy)return;busy=true;$('bGen').disabled=true;msg('Smišljam kolone…');
+  try{
+    game.cols=blank().cols;
+    const r=await ask(prompt(final,false));
+    if(!r||!Array.isArray(r.cols)||r.cols.length<4)throw new Error('format');
+    game.final=withAlt(final,r.final_alt);
+    game.cols=r.cols.slice(0,4).map(clean);
+    renderEd();$('fin').value=game.final;msg('Gotovo! Proveri pojmove, izmeni šta želiš i klikni „Igraj”.');
+  }catch(e){
+    renderEd();
+    msg(e&&e.code==='rate_limited'?'Previše zahteva — sačekaj malo pa pokušaj ponovo.':e&&e.code==='not_granted'?'Dozvola za Claude nije data — popuni polja ručno.':'Nije uspelo popunjavanje. Pokušaj ponovo.',true);
+  }finally{busy=false;$('bGen').disabled=false}
+}
+async function regenCol(i){
+  const final=(game.final||$('fin').value).split('/')[0].trim();
+  if(!final){msg('Prvo upiši konačno rešenje.',true);return}
+  if(!sample||busy)return;busy=true;msg(`Pravim novu kolonu ${L[i]}…`);
+  try{const r=await ask(prompt(final,true));if(!r||!r.sol)throw 0;game.cols[i]=clean(r);renderEd();msg(`Kolona ${L[i]} je zamenjena.`)}
+  catch(e){msg('Nova kolona nije uspela. Pokušaj ponovo.',true)}finally{busy=false}
+}
+$('bGen').onclick=generate;
+
+/* ---------- čuvanje i deljenje ---------- */
+function renderLib(){
+  const s=store.get(),list=s.games||[];
+  $('lib').innerHTML=list.length?list.map((g,k)=>`<div><span>${esc(g.final.split('/')[0])}</span><span class="row"><button class="btn ghost" data-open="${k}">Otvori</button><button class="btn ghost" data-del="${k}">Obriši</button></span></div>`).join(''):'<p class="hint">Još nema sačuvanih asocijacija.</p>';
+}
+$('lib').addEventListener('click',e=>{
+  const s=store.get(),list=s.games||[],o=e.target.dataset.open,d=e.target.dataset.del;
+  if(o!==undefined){game=JSON.parse(JSON.stringify(list[+o]));$('fin').value=game.final;renderEd();msg('Učitano.')}
+  if(d!==undefined){list.splice(+d,1);store.set({...s,games:list});renderLib()}
+});
+$('bSave').onclick=()=>{
+  if(!game.final.trim()){msg('Nema šta da se sačuva — upiši konačno rešenje.',true);return}
+  const s=store.get(),list=(s.games||[]).filter(g=>g.final!==game.final);list.unshift(JSON.parse(JSON.stringify(game)));
+  store.set({...s,games:list.slice(0,50)});renderLib();$('libBox').open=true;msg('Sačuvano u ovom pregledaču.');
+};
+$('bClear').onclick=()=>{game=blank();$('fin').value='';renderEd();msg('')};
+const enc=o=>btoa(unescape(encodeURIComponent(JSON.stringify(o))));
+const dec=s=>JSON.parse(decodeURIComponent(escape(atob(s.trim()))));
+$('bCode').onclick=()=>{$('code').value=enc(game)};
+$('bLoad').onclick=()=>{try{const g=dec($('code').value);if(!g.cols||g.cols.length!==4)throw 0;game=g;$('fin').value=g.final;renderEd();msg('Kod učitan.')}catch(e){msg('Kod nije ispravan.',true)}};
+$('bCopy').onclick=async()=>{const t=$('code');if(!t.value)t.value=enc(game);try{await navigator.clipboard.writeText(t.value);msg('Kod kopiran.')}catch(e){t.select();msg('Označeno — kopiraj sa Ctrl+C.')}};
+
+/* ---------- igra ---------- */
+const TR={'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'dj','ѓ':'gj','е':'e','ж':'z','з':'z','ѕ':'dz','и':'i','й':'j','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o','п':'p','р':'r','с':'s','т':'t','ћ':'c','ќ':'kj','у':'u','ф':'f','х':'h','ц':'c','ч':'c','џ':'dz','ш':'s','щ':'st','ъ':'a','ь':'','ю':'ju','я':'ja','đ':'dj'};
+const norm=s=>String(s).toLowerCase().replace(/./g,c=>TR[c]??c).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+function lev(a,b){const d=Array.from({length:b.length+1},(_,i)=>i);for(let i=1;i<=a.length;i++){let p=d[0];d[0]=i;for(let j=1;j<=b.length;j++){const t=d[j];d[j]=Math.min(d[j]+1,d[j-1]+1,p+(a[i-1]===b[j-1]?0:1));p=t}}return d[b.length]}
+const match=(guess,sol)=>{const g=norm(guess);if(!g)return false;return sol.split('/').map(norm).filter(Boolean).some(s=>s===g||(s.length>=6&&lev(s,g)<=1))};
+const first=s=>String(s).split('/')[0].trim();
+
+let st;
+function newState(){st={open:new Set(),solved:[0,0,0,0],final:false,score:[0,0],turn:0,editing:null,revealed:false}}
+function colPts(i){let n=0;for(let j=0;j<4;j++)if(!st.open.has(i+'-'+j))n++;return 2+n}
+function renderTeams(){
+  const two=$('twoT').checked,names=two?['Tim 1','Tim 2']:['Bodovi'],cols=['#3b82f6','#e5484d'];
+  $('teams').innerHTML=names.map((n,k)=>`<div class="team ${two&&st.turn===k?'on':''}"><span class="dot" style="background:${cols[k]}"></span>${n}<b>${st.score[k]}</b></div>`).join('');
+  $('bPass').classList.toggle('hide',!two);
+}
+function plCol(i){
+  const c=game.cols[i],up=i>1;
+  const clues=c.clues.map((v,j)=>{const o=st.open.has(i+'-'+j);return `<div class="cell ${o?'open':''}" data-o="${i}-${j}" role="button" tabindex="${o?-1:0}"><span class="tag">${L[i]}${j+1}</span>${o?esc(v||'—'):L[i]+(j+1)}</div>`}).join('');
+  const sv=st.solved[i];
+  const sol=st.editing===i?`<div class="cell sol" id="ed"><input id="gIn" placeholder="Rešenje ${L[i]}?" autocomplete="off"></div>`
+    :`<div class="cell sol ${sv?'done':''}" data-g="${i}" role="button" tabindex="${sv?-1:0}">${sv?esc(first(c.sol)):L[i]+' ?'}</div>`;
+  return `<div class="col ${up?'up':''}">${clues+sol}</div>`;
+}
+function renderPlay(){
+  const fin=st.editing==='F'?`<div class="cell final hid" id="ed"><input id="gIn" placeholder="Konačno rešenje?" autocomplete="off"></div>`
+    :`<div class="cell final ${st.final?'done':'hid'}" data-g="F" role="button" tabindex="${st.final?-1:0}">${st.final?esc(first(game.final)):'KONAČNO REŠENJE ?'}</div>`;
+  $('plBoard').innerHTML=plCol(0)+plCol(1)+fin+plCol(2)+plCol(3);
+  renderTeams();
+  const g=$('gIn');if(g)g.focus();
+}
+function award(p){st.score[$('twoT').checked?st.turn:0]+=p}
+function nextTurn(){if($('twoT').checked)st.turn=1-st.turn}
+function solveCol(i,pts){if(pts)award(colPts(i));st.solved[i]=1;for(let j=0;j<4;j++)st.open.add(i+'-'+j)}
+function submit(v){
+  const k=st.editing;st.editing=null;
+  if(!v.trim()){renderPlay();return}
+  if(k==='F'){
+    if(match(v,game.final)){let p=7;for(let i=0;i<4;i++)if(!st.solved[i]){p+=colPts(i);solveCol(i,false)}award(p);st.final=true;renderPlay();return}
+  }else if(match(v,game.cols[k].sol)){solveCol(k,true);renderPlay();return}
+  nextTurn();renderPlay();
+  const el=document.querySelector(k==='F'?'[data-g="F"]':`[data-g="${k}"]`);if(el){el.classList.add('wrong');setTimeout(()=>el.classList.remove('wrong'),400)}
+}
+function act(t){
+  if(st.final)return;
+  const o=t.closest('[data-o]');
+  if(o&&!st.open.has(o.dataset.o)){st.open.add(o.dataset.o);st.editing=null;renderPlay();return}
+  const g=t.closest('[data-g]');
+  if(g){const k=g.dataset.g==='F'?'F':+g.dataset.g;if(k!=='F'&&st.solved[k])return;st.editing=k;renderPlay()}
+}
+$('plBoard').addEventListener('click',e=>{if(e.target.id!=='gIn')act(e.target)});
+$('plBoard').addEventListener('keydown',e=>{
+  if(e.target.id==='gIn'){if(e.key==='Enter')submit(e.target.value);if(e.key==='Escape'){st.editing=null;renderPlay()}return}
+  if(e.key==='Enter'||e.key===' '){e.preventDefault();act(e.target)}
+});
+$('plBoard').addEventListener('focusout',e=>{if(e.target.id==='gIn')setTimeout(()=>{if(st.editing!==null&&!document.activeElement?.closest('#ed')){st.editing=null;renderPlay()}},150)});
+$('bPass').onclick=()=>{nextTurn();renderTeams()};
+$('bReveal').onclick=()=>{for(let i=0;i<4;i++)solveCol(i,false);st.final=true;st.editing=null;renderPlay()};
+$('bRestart').onclick=()=>{newState();renderPlay()};
+$('twoT').onchange=()=>{st.score=[0,0];st.turn=0;renderTeams()};
+
+/* ---------- režimi ---------- */
+function ready(){return game.final.trim()&&game.cols.every(c=>c.sol.trim()&&c.clues.every(x=>x.trim()))}
+function show(play){
+  if(play&&!ready()){msg('Popuni sva polja (ili klikni „Popuni tablu”) pre igre.',true);return}
+  $('vEd').classList.toggle('hide',play);$('vPlay').classList.toggle('hide',!play);
+  $('tEd').classList.toggle('on',!play);$('tPlay').classList.toggle('on',play);
+  if(play){newState();renderPlay()}else renderEd();
+  window.scrollTo({top:0});
+}
+$('tEd').onclick=()=>show(false);$('tPlay').onclick=()=>show(true);$('bPlay').onclick=()=>show(true);
+
+newState();renderEd();renderLib();
+const d=store.get();if(d.draft){try{game=d.draft;$('fin').value=game.final;renderEd()}catch(e){}}
+setInterval(()=>{const s=store.get();store.set({...s,draft:game})},3000);
+msg('Učitavam pomoćnika…');
+(async()=>{
+  for(let t=0;t<20&&!window.claude;t++)await new Promise(r=>setTimeout(r,250));
+  try{sample=window.claude?await window.claude.use('sample'):null}catch(e){sample=null}
+  if(sample){msg('Upiši konačno rešenje i klikni „Popuni tablu”.');renderEd()}
+  else msg('Automatsko popunjavanje ovde nije dostupno — sva polja možeš popuniti ručno.');
+})();
+}
+</script>
+</body>
+</html>
