@@ -73,6 +73,8 @@ border:1px solid #ffffff2a;box-shadow:inset 0 1px 0 #ffffff40,0 3px 0 #06123a;cu
 .lib span{font-weight:600}
 textarea{min-height:90px;font:13px/1.4 ui-monospace,monospace}
 .hide{display:none!important}
+.sr{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;overflow:hidden}
+#passBox{position:relative}
 details{margin-top:14px}
 .adm{display:grid;gap:8px;margin-top:10px}
 .adm .it{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
@@ -106,7 +108,7 @@ details{margin-top:14px}
 <section id="vEd">
   <div class="card">
     <div class="gen">
-      <div class="wide"><label for="fin">Konačno rešenje</label><input id="fin" placeholder="npr. ZIMA" autocomplete="off"></div>
+      <div class="wide"><label for="fin">Konačno rešenje</label><input id="fin" name="konacno-resenje" placeholder="npr. ZIMA" autocomplete="off" data-lpignore="true" data-1p-ignore></div>
       <div><label for="lang">Jezik</label><select id="lang">
         <option value="srpski, latinica">Srpski (latinica)</option><option value="srpski, ćirilica">Srpski (ћирилица)</option>
         <option value="makedonski (ćirilica)">Македонски</option><option value="bugarski (ćirilica)">Български</option>
@@ -114,7 +116,7 @@ details{margin-top:14px}
       <div><label for="age">Uzrast</label><select id="age"><option value="mlađi osnovci (7–10 godina)">7–10 god.</option><option value="stariji osnovci (11–14 godina)" selected>11–14 god.</option><option value="srednjoškolci i odrasli">15+ god.</option></select></div>
       <div><label for="lvl">Težina</label><select id="lvl"><option value="laka">Laka</option><option value="srednja" selected>Srednja</option><option value="teška">Teška</option></select></div>
       <button class="btn gold" id="bGen">Popuni tablu</button>
-      <div class="wide hide" id="passBox"><label for="pass">Šifra za nastavnike (potrebna za automatsko popunjavanje)</label><input id="pass" type="password" autocomplete="current-password" placeholder="Unesi šifru"></div>
+      <form class="wide hide" id="passBox" onsubmit="return false"><input type="text" name="username" autocomplete="username" value="nastavnik" tabindex="-1" aria-hidden="true" class="sr"><label for="pass">Šifra za nastavnike (potrebna za automatsko popunjavanje)</label><input id="pass" name="password" type="password" autocomplete="current-password" placeholder="Unesi šifru"></form>
     </div>
     <p class="msg" id="msg"></p>
   </div>
@@ -422,7 +424,7 @@ function show(play){
 $('tEd').onclick=()=>show(false);$('tPlay').onclick=()=>show(true);$('bPlay').onclick=()=>show(true);
 
 newState();renderEd();renderLib();
-const d=store.get();if(d.draft){try{game=d.draft;$('fin').value=game.final;renderEd()}catch(e){}}
+const d=store.get();if(d.draft){try{game=d.draft;if(/\S+@\S+\.\S+/.test(game.final||''))game.final='';$('fin').value=game.final;renderEd()}catch(e){}}
 setInterval(()=>{const s=store.get();store.set({...s,draft:game})},3000);
 msg('Učitavam pomoćnika…');
 (async()=>{
