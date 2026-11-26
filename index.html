@@ -79,6 +79,20 @@ details{margin-top:14px}
 .adm .it.off{opacity:.6}.adm .it small{color:var(--mute);display:block}
 .addf{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin-top:10px;align-items:end}
 @media(max-width:600px){.addf{grid-template-columns:minmax(0,1fr)}}summary{cursor:pointer;font-weight:600;padding:8px 0}
+/* uputstvo */
+.helpb{border:0;background:var(--gold);color:var(--goldInk);font:700 16px Barlow;padding:10px 16px;border-radius:9px;min-height:44px;cursor:pointer}
+.tour-hole{position:fixed;z-index:50;border-radius:12px;box-shadow:0 0 0 4px var(--gold),0 0 0 9999px #050b1fcc;pointer-events:none;transition:all .25s ease}
+.tour-tip{position:fixed;z-index:51;width:min(360px,calc(100vw - 24px));background:#fff;color:#0b1633;border-radius:14px;padding:14px 16px 12px;box-shadow:0 12px 30px #0008;font-size:16px;line-height:1.45}
+.tour-tip::before{content:"";position:absolute;left:var(--ax,40px);width:0;height:0;border:12px solid transparent}
+.tour-tip.below::before{top:-24px;border-bottom-color:#fff}.tour-tip.above::before{bottom:-24px;border-top-color:#fff}
+.tour-tip b.n{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:var(--gold);color:var(--goldInk);margin-right:8px;font:700 16px Barlow}
+.tour-tip h3{margin:0 0 6px;font:700 20px/1.2 "Barlow Condensed",sans-serif;display:flex;align-items:center}
+.tour-tip p{margin:0 0 10px}
+.tour-nav{display:flex;gap:8px;justify-content:space-between;align-items:center}
+.tour-nav button{font:600 15px Barlow;border-radius:9px;min-height:40px;padding:8px 14px;cursor:pointer;border:1px solid #cdd6ea;background:#fff;color:#0b1633}
+.tour-nav .go{background:#1d4fb8;color:#fff;border-color:#1d4fb8}
+.tour-nav span{color:#4b5a7d;font-size:14px}
+@media(prefers-reduced-motion:reduce){.tour-hole{transition:none}}
 @media(max-width:760px){.gen{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gen .wide{grid-column:1/-1}}
 @media(max-width:520px){.board{grid-template-columns:minmax(0,1fr)}.col.up{flex-direction:column}.cell{min-height:46px}.cell.final{order:5}}
 </style>
@@ -86,7 +100,7 @@ details{margin-top:14px}
 <body>
 <header class="top">
   <div><h1>Asocijacije</h1><p>Upiši konačno rešenje — tabla se popuni sama i spremna je za igru.</p></div>
-  <nav class="tabs" aria-label="Režim"><button id="tEd" class="on">Priprema</button><button id="tPlay">Igra</button></nav>
+  <div class="row"><nav class="tabs" aria-label="Režim"><button id="tEd" class="on">Priprema</button><button id="tPlay">Igra</button></nav><button class="helpb" id="bHelp">Uputstvo</button></div>
 </header>
 <main>
 <section id="vEd">
@@ -145,6 +159,7 @@ details{margin-top:14px}
 </section>
 </main>
 
+<div id="tour" class="hide" role="dialog" aria-modal="true" aria-labelledby="tourT"><div class="tour-hole" id="tourHole"></div><div class="tour-tip" id="tourTip"><h3><b class="n" id="tourN">1</b><span id="tourT"></span></h3><p id="tourP"></p><div class="tour-nav"><button id="tourX">Zatvori</button><span id="tourC"></span><span><button id="tourB">Nazad</button> <button class="go" id="tourF">Dalje</button></span></div></div></div>
 <script>
 {
 const L=['A','B','C','D'];
@@ -294,6 +309,47 @@ $('admList').addEventListener('click',e=>{
   if(t.dataset.rm){if(delArm===t){adm('remove',{id:+t.dataset.rm})}else{delArm=t;t.textContent='Sigurno obriši?'}}
 });
 
+/* ---------- uputstvo sa strelicama ---------- */
+const TOUR=[
+  {sel:['#passBox'],t:'Upiši šifru',p:'Ovde upiši šifru koju si dobio. Pregledač će je zapamtiti, pa je sledeći put ne moraš ponovo kucati.',need:'remote'},
+  {sel:['#fin'],t:'Konačno rešenje',p:'Upiši pojam do kog učenici treba da dođu, npr. JESEN. Ostala polja se popunjavaju sama.'},
+  {sel:['#lang','#age','#lvl'],t:'Jezik, uzrast i težina',p:'Izaberi na kom jeziku se igra, za koji uzrast i koliko teški treba da budu pojmovi.'},
+  {sel:['#bGen'],t:'Popuni tablu',p:'Klikni ovo dugme i sačekaj nekoliko sekundi. Ako piše „Pogrešna šifra”, šifra je pogrešno upisana ili je isključena — javi se onome ko ti ju je dao.'},
+  {sel:['#edBoard'],t:'Proveri pojmove',p:'Pregledaj tablu pre igre. Svako polje možeš da ispraviš klikom. Dugme „↻ nova” pravi novu kolonu.'},
+  {sel:['#bPlay'],t:'Igraj',p:'Kad je tabla spremna, klikni ovde. U igri se polja otvaraju klikom, a odgovor se upisuje klikom na plavo polje sa znakom pitanja.'},
+  {sel:['#bSave','#bClear'],t:'Sačuvaj za kasnije',p:'„Sačuvaj” čuva tablu u ovom pregledaču. Ispod, u „Sačuvane asocijacije i deljenje”, možeš napraviti kod table i poslati ga kolegi.'}
+];
+let tourSteps=[],tourI=0;
+function tourRect(sels){let r=null;for(const q of sels){const e=document.querySelector(q);if(!e||e.closest('.hide'))continue;const b=(q==='#lang'||q==='#age'||q==='#lvl'||q==='#fin')?e.parentElement.getBoundingClientRect():e.getBoundingClientRect();r=r?{left:Math.min(r.left,b.left),top:Math.min(r.top,b.top),right:Math.max(r.right,b.right),bottom:Math.max(r.bottom,b.bottom)}:{left:b.left,top:b.top,right:b.right,bottom:b.bottom}}return r}
+function tourPlace(){
+  const st=tourSteps[tourI];if(!st)return;const r=tourRect(st.sel);if(!r)return;
+  const pad=8,h=$('tourHole'),tip=$('tourTip');
+  Object.assign(h.style,{left:(r.left-pad)+'px',top:(r.top-pad)+'px',width:(r.right-r.left+pad*2)+'px',height:(r.bottom-r.top+pad*2)+'px'});
+  const tw=tip.offsetWidth,th=tip.offsetHeight,vw=innerWidth,vh=innerHeight;
+  const cx=(r.left+r.right)/2,left=Math.max(12,Math.min(vw-tw-12,cx-tw/2));
+  const below=r.bottom+pad+20+th<vh||r.top-pad-20-th<0;
+  tip.classList.toggle('below',below);tip.classList.toggle('above',!below);
+  tip.style.left=left+'px';tip.style.top=(below?r.bottom+pad+20:r.top-pad-20-th)+'px';
+  tip.style.setProperty('--ax',Math.max(14,Math.min(tw-38,cx-left-12))+'px');
+}
+function tourShow(i){
+  tourI=i;const st=tourSteps[i];$('tourN').textContent=i+1;$('tourT').textContent=st.t;$('tourP').textContent=st.p;
+  $('tourC').textContent=(i+1)+' / '+tourSteps.length;$('tourB').disabled=i===0;$('tourF').textContent=i===tourSteps.length-1?'Gotovo':'Dalje';
+  const e=document.querySelector(st.sel[0]);if(e)e.scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+  tourPlace();setTimeout(tourPlace,350);$('tourF').focus();
+}
+function tourStart(){
+  if($('vEd').classList.contains('hide'))show(false);
+  tourSteps=TOUR.filter(s=>s.need!=='remote'||!sample);$('tour').classList.remove('hide');tourShow(0);
+}
+function tourEnd(){$('tour').classList.add('hide');try{localStorage.setItem('asocijacije.tour','1')}catch(e){}}
+$('bHelp').onclick=tourStart;
+$('tourX').onclick=tourEnd;$('tourB').onclick=()=>tourI>0&&tourShow(tourI-1);
+$('tourF').onclick=()=>tourI<tourSteps.length-1?tourShow(tourI+1):tourEnd();
+addEventListener('resize',()=>{if(!$('tour').classList.contains('hide'))tourPlace()});
+addEventListener('scroll',()=>{if(!$('tour').classList.contains('hide'))tourPlace()},{passive:true});
+addEventListener('keydown',e=>{if($('tour').classList.contains('hide'))return;if(e.key==='Escape')tourEnd();if(e.key==='ArrowRight')$('tourF').click();if(e.key==='ArrowLeft')$('tourB').click()});
+
 /* ---------- igra ---------- */
 const TR={'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'dj','ѓ':'gj','е':'e','ж':'z','з':'z','ѕ':'dz','и':'i','й':'j','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o','п':'p','р':'r','с':'s','т':'t','ћ':'c','ќ':'kj','у':'u','ф':'f','х':'h','ц':'c','ч':'c','џ':'dz','ш':'s','щ':'st','ъ':'a','ь':'','ю':'ju','я':'ja','đ':'dj'};
 const norm=s=>String(s).toLowerCase().replace(/./g,c=>TR[c]??c).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
@@ -370,10 +426,10 @@ const d=store.get();if(d.draft){try{game=d.draft;$('fin').value=game.final;rende
 setInterval(()=>{const s=store.get();store.set({...s,draft:game})},3000);
 msg('Učitavam pomoćnika…');
 (async()=>{
-  for(let t=0;t<20&&!window.claude;t++)await new Promise(r=>setTimeout(r,250));
+  for(let t=0;t<12&&!window.claude;t++)await new Promise(r=>setTimeout(r,250));
   try{sample=window.claude?await window.claude.use('sample'):null}catch(e){sample=null}
   if(sample){msg('Upiši konačno rešenje i klikni „Popuni tablu”.');renderEd()}
-  else{$('passBox').classList.remove('hide');$('admBox').classList.remove('hide');try{$('pass').value=localStorage.getItem('asocijacije.pass')||''}catch(e){}msg('Upiši konačno rešenje i šifru za nastavnike, pa klikni „Popuni tablu”. Polja možeš popuniti i ručno.')}
+  else{$('passBox').classList.remove('hide');$('admBox').classList.remove('hide');let seen=true;try{$('pass').value=localStorage.getItem('asocijacije.pass')||'';seen=!!localStorage.getItem('asocijacije.tour')||!!$('pass').value}catch(e){}if(!seen)setTimeout(tourStart,400);msg('Upiši konačno rešenje i šifru za nastavnike, pa klikni „Popuni tablu”. Polja možeš popuniti i ručno.')}
 })();
 }
 </script>
