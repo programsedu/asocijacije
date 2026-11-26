@@ -73,7 +73,12 @@ border:1px solid #ffffff2a;box-shadow:inset 0 1px 0 #ffffff40,0 3px 0 #06123a;cu
 .lib span{font-weight:600}
 textarea{min-height:90px;font:13px/1.4 ui-monospace,monospace}
 .hide{display:none!important}
-details{margin-top:14px}summary{cursor:pointer;font-weight:600;padding:8px 0}
+details{margin-top:14px}
+.adm{display:grid;gap:8px;margin-top:10px}
+.adm .it{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;padding:8px 10px;border:1px solid var(--line);border-radius:10px}
+.adm .it.off{opacity:.6}.adm .it small{color:var(--mute);display:block}
+.addf{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto;gap:8px;margin-top:10px;align-items:end}
+@media(max-width:600px){.addf{grid-template-columns:minmax(0,1fr)}}summary{cursor:pointer;font-weight:600;padding:8px 0}
 @media(max-width:760px){.gen{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}.gen .wide{grid-column:1/-1}}
 @media(max-width:520px){.board{grid-template-columns:minmax(0,1fr)}.col.up{flex-direction:column}.cell{min-height:46px}.cell.final{order:5}}
 </style>
@@ -111,6 +116,17 @@ details{margin-top:14px}summary{cursor:pointer;font-weight:600;padding:8px 0}
     <p class="hint">Kod igre kopiraj i pošalji drugom nastavniku; on ga nalepi ovde i klikne „Učitaj kod”.</p>
     <div class="row"><button class="btn ghost" id="bCode">Napravi kod ove table</button><button class="btn ghost" id="bLoad">Učitaj kod</button><button class="btn ghost" id="bCopy">Kopiraj</button></div>
     <textarea id="code" style="margin-top:8px" placeholder="Ovde se pojavljuje kod igre ili ga nalepi…"></textarea>
+  </details>
+  <details class="card hide" id="admBox"><summary>Šifre za nastavnike (samo glavna šifra)</summary>
+    <p class="hint">Dodatne šifre možeš dati drugim nastavnicima. Isključena ili obrisana šifra odmah prestaje da radi. Upravljati šiframa može samo onaj ko je gore upisao glavnu šifru.</p>
+    <div class="row"><button class="btn ghost" id="bAdm">Prikaži šifre</button></div>
+    <div class="adm" id="admList"></div>
+    <div class="addf hide" id="admAdd">
+      <div><label for="aName">Za koga (naziv)</label><input id="aName" placeholder="npr. Marija, 4. razred" maxlength="60"></div>
+      <div><label for="aPass">Nova šifra (najmanje 4 znaka)</label><input id="aPass" autocomplete="new-password"></div>
+      <button class="btn" id="bAdd">Dodaj šifru</button>
+    </div>
+    <p class="msg" id="admMsg"></p>
   </details>
 </section>
 
@@ -250,6 +266,34 @@ $('bCode').onclick=()=>{$('code').value=enc(game)};
 $('bLoad').onclick=()=>{try{const g=dec($('code').value);if(!g.cols||g.cols.length!==4)throw 0;game=g;$('fin').value=g.final;renderEd();msg('Kod učitan.')}catch(e){msg('Kod nije ispravan.',true)}};
 $('bCopy').onclick=async()=>{const t=$('code');if(!t.value)t.value=enc(game);try{await navigator.clipboard.writeText(t.value);msg('Kod kopiran.')}catch(e){t.select();msg('Označeno — kopiraj sa Ctrl+C.')}};
 
+/* ---------- šifre za nastavnike ---------- */
+const AERR={wrong_password:'Pogrešna šifra.',not_admin:'Samo glavna šifra može da upravlja šiframa.',bad_input:'Upiši naziv i šifru od najmanje 4 znaka.',same_as_main:'Dodatna šifra ne sme biti ista kao glavna.'};
+function amsg(t,err){const m=$('admMsg');m.textContent=t;m.classList.toggle('err',!!err)}
+let delArm=null;
+async function adm(action,extra){
+  const password=$('pass').value;
+  if(!password){amsg('Prvo gore upiši glavnu šifru.',true);$('pass').focus();return}
+  amsg('Učitavam…');
+  try{
+    const res=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({password,admin:action,...extra})});
+    const d=await res.json().catch(()=>({}));
+    if(!res.ok||!d.list){amsg(AERR[d.error]||'Nije uspelo. Pokušaj ponovo.',true);return}
+    renderAdm(d.list);$('admAdd').classList.remove('hide');amsg(d.list.length?'':'Još nema dodatnih šifri.');
+  }catch(e){amsg('Nema veze sa serverom.',true)}
+}
+const fmt=d=>{try{return new Date(d).toLocaleDateString('sr-Latn')}catch(e){return ''}};
+function renderAdm(list){
+  delArm=null;
+  $('admList').innerHTML=list.map(r=>`<div class="it ${r.aktivna?'':'off'}"><span><b>${esc(r.naziv)}</b><small>${r.aktivna?'Uključena':'Isključena'} · popunjavanja: ${Number(r.koriscenja)||0}${r.poslednje?' · poslednje: '+esc(fmt(r.poslednje)):''}</small></span><span class="row"><button class="btn ghost" data-tg="${Number(r.id)}" data-on="${r.aktivna?0:1}">${r.aktivna?'Isključi':'Uključi'}</button><button class="btn ghost" data-rm="${Number(r.id)}">Obriši</button></span></div>`).join('');
+}
+$('bAdm').onclick=()=>adm('list');
+$('bAdd').onclick=async()=>{const naziv=$('aName').value.trim(),nova=$('aPass').value;if(!naziv||nova.length<4){amsg(AERR.bad_input,true);return}await adm('add',{naziv,nova});if(!$('admMsg').classList.contains('err')){$('aName').value='';$('aPass').value='';amsg('Šifra je dodata.')}};
+$('admList').addEventListener('click',e=>{
+  const t=e.target.closest('button');if(!t)return;
+  if(t.dataset.tg)adm('toggle',{id:+t.dataset.tg,aktivna:t.dataset.on==='1'});
+  if(t.dataset.rm){if(delArm===t){adm('remove',{id:+t.dataset.rm})}else{delArm=t;t.textContent='Sigurno obriši?'}}
+});
+
 /* ---------- igra ---------- */
 const TR={'а':'a','б':'b','в':'v','г':'g','д':'d','ђ':'dj','ѓ':'gj','е':'e','ж':'z','з':'z','ѕ':'dz','и':'i','й':'j','ј':'j','к':'k','л':'l','љ':'lj','м':'m','н':'n','њ':'nj','о':'o','п':'p','р':'r','с':'s','т':'t','ћ':'c','ќ':'kj','у':'u','ф':'f','х':'h','ц':'c','ч':'c','џ':'dz','ш':'s','щ':'st','ъ':'a','ь':'','ю':'ju','я':'ja','đ':'dj'};
 const norm=s=>String(s).toLowerCase().replace(/./g,c=>TR[c]??c).normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
@@ -329,7 +373,7 @@ msg('Učitavam pomoćnika…');
   for(let t=0;t<20&&!window.claude;t++)await new Promise(r=>setTimeout(r,250));
   try{sample=window.claude?await window.claude.use('sample'):null}catch(e){sample=null}
   if(sample){msg('Upiši konačno rešenje i klikni „Popuni tablu”.');renderEd()}
-  else{$('passBox').classList.remove('hide');try{$('pass').value=localStorage.getItem('asocijacije.pass')||''}catch(e){}msg('Upiši konačno rešenje i šifru za nastavnike, pa klikni „Popuni tablu”. Polja možeš popuniti i ručno.')}
+  else{$('passBox').classList.remove('hide');$('admBox').classList.remove('hide');try{$('pass').value=localStorage.getItem('asocijacije.pass')||''}catch(e){}msg('Upiši konačno rešenje i šifru za nastavnike, pa klikni „Popuni tablu”. Polja možeš popuniti i ručno.')}
 })();
 }
 </script>
